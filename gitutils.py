@@ -7,6 +7,7 @@ class BrowsedRepo():
     def __init__(self, path):
         path = os.path.abspath(path)
         self.repo = git.Repository(path)
+        self.tree = None
 
     def branches(self, all = False):
         return self.repo.listall_branches()
@@ -18,8 +19,25 @@ class BrowsedRepo():
         for commit in walker:
             yield CommitInfo(commit)
 
+    def branch_contains(self, branch, commitid):
+        # Get the commit ID only.
+        if type(commitid) != str:
+            commitid = str(commitid.id)
+
+        walker = self.repo.walk(self.repo.lookup_branch(branch)
+                .get_object().id)
+
+        # Compare each commit in the tree, starting from the tip of the
+        # branch.
+        for commit in walker:
+            if commitid == str(commit.id):
+                return True
+
+        # If nothing matched, return False.
+        return False
+
     def build_tree(self):
-        rt = RepoTree()
+        self.tree = RepoTree()
 
         # For each branch, index all the commits in the branch.
         for branch in self.repo.listall_branches():
@@ -32,9 +50,13 @@ class BrowsedRepo():
             # one.
 
             for commit in walker:
-                rt.index(commit, commit.parents)
+                self.tree.index(commit, commit.parents)
 
-        return rt
+        return self.tree
+
+    def balance_tree_on(self, branch):
+        print("Balancing tree")
+        self.tree.balance_on(self.branch_contains, *self.branches())
 
 class CommitInfo():
     def __init__(self, commit):
@@ -46,7 +68,7 @@ class CommitInfo():
     def to_node(self):
         return graph.Node(self.id,
                 str(self),
-                x = 0,
+                x = self.center_shift,
                 y = self.time_in_the_past(),
                 *self.children
                 )
@@ -115,6 +137,28 @@ class RepoTree():
             print("Recording new root %s" % commit.sid)
             self.roots.append(commit.id)
             return
+
+    def balance_on(self, membership_function, *center_priorities):
+        # For every commit,
+        for commit in self.commits.values():
+            # First, unset x.
+            commit.center_shift = None
+
+            # Try to match it to the centermost category. For example,
+            # by branch - commits in 'master' will be centered, others
+            # will be offset.
+            for index, center_val in enumerate(center_priorities):
+                # If it matches, set its center_shift to its category's
+                # position in the list.
+                if membership_function(center_val, commit):
+                    print("Moving commit.center_shift to %s" % index)
+                    commit.center_shift = index
+                    continue
+
+
+            # If there are no matches, move it all the way out.
+            commit.center_shift = len(center_priorities)
+            self.commits[commit.id] = commit
 
     def to_graph(self):
         g = graph.Graph()
