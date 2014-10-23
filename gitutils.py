@@ -1,4 +1,5 @@
 import os
+import time
 import graph
 import pygit2 as git
 
@@ -43,10 +44,20 @@ class CommitInfo():
         self.children = []
 
     def to_node(self):
-        return graph.Node(str(self.commit.id), str(self))
+        return graph.Node(self.id,
+                str(self),
+                x = 0,
+                y = self.time_in_the_past(),
+                *self.children
+                )
+
+    def time_in_the_past(self):
+        unixauthor = self.commit.author.time
+        unixnow = int(time.time())
+        return (unixnow - unixauthor)/3600
 
     def __str__(self):
-        return "%s %s (%s)" % (str(self.commit.id)[:7],
+        return "%s %s (%s)" % (self.sid,
                 self.commit.message.split('\n')[0],
                 self.commit.author.name)
 
@@ -104,3 +115,10 @@ class RepoTree():
             print("Recording new root %s" % commit.sid)
             self.roots.append(commit.id)
             return
+
+    def to_graph(self):
+        g = graph.Graph()
+        for commit in self.commits.values():
+            g.add(commit.to_node())
+
+        return g
