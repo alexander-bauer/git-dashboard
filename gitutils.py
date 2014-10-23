@@ -66,31 +66,28 @@ class RepoTree():
 
     def index(self, commit, parents):
         """Record two raw or info-wrapped commit objects."""
-        # Check if the commit was given. If so, look it up in our
-        # database. Use the existing one if so.
-        newcommit = True
+        # Check if the commit was given.
         if commit == None:
             raise MissingCommitError("Commit not given")
 
-        if commit.id in self.commits:
-            newcommit = False
-            commit = self.commits[commit.id]
-        else:
-            # Typeconvert real quick
-            if type(commit) != CommitInfo:
-                commit = CommitInfo(commit)
+        # Typeconvert real quick
+        if type(commit) != CommitInfo:
+            commit = CommitInfo(commit)
 
-            # Record the commit in the tree.
-            self.commits[commit.id] = commit
+        # Check if the commit is in the database already. If so, skip
+        # re-indexing it.
+        if commit.id in self.commits:
+            return
+
+        # Record the commit in the tree.
+        self.commits[commit.id] = commit
 
         # Perform a similar type conversion for each of the parents,
         # looking each of them up first. In each one, record the child
         # commit.
-        newparent = [True] * len(parents)
         for index, parent in enumerate(parents):
             if parent.id in self.commits:
                 parents[index] = self.commits[parent.id]
-                newparent[index] = False
             else:
                 # Typeconvert real quick, if necessary.
                 if type(parent) != CommitInfo:
@@ -103,7 +100,7 @@ class RepoTree():
 
 
         # If there are no parents, then the commit is a root.
-        if len(parents) == 0 and commit.id not in self.roots:
+        if len(parents) == 0:
             print("Recording new root %s" % commit.sid)
             self.roots.append(commit.id)
             return
