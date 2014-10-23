@@ -25,20 +25,21 @@ class BrowsedRepo():
             walker = self.repo.walk(
                     self.repo.lookup_branch(branch).get_object().id)
 
+            # We will walk from the top of the branch (the latest
+            # commit) back to the root. So each commit we index will
+            # have children to have come before it, except the first
+            # one.
+
             for commit in walker:
-                print(commit.parens)
-                for parent in commit.parents:
-                    rt.index(parent, commit)
-
-                if len(commits.parens) == 0:
-                    rt.index(None, commit)
-
+                rt.index(commit, commit.parents)
 
         return rt
 
 class CommitInfo():
     def __init__(self, commit):
         self.commit = commit
+        self.id = str(commit.id)
+        self.sid = self.id[:7]
         self.children = []
 
     def to_node(self):
@@ -57,43 +58,52 @@ class RepoTree():
     """Record commit heritage in a more easily traversible way, similar
     to singly linked list from root to leaves."""
 
+    class MissingCommitError(Exception): pass
+
     def __init__(self):
         self.roots = []
         self.commits = {}
 
-    def index(self, commit, child):
-        """Record two raw commit objects."""
-        # Check if the commit exists.
-        id = str(commit.id)
-        new = True
-        if id in self.commits:
-            commitinfo = self.commits[id]
-            new = False
+    def index(self, commit, parents):
+        """Record two raw or info-wrapped commit objects."""
+        # Check if the commit was given. If so, look it up in our
+        # database. Use the existing one if so.
+        newcommit = True
+        if commit == None:
+            raise MissingCommitError("Commit not given")
+
+        if commit.id in self.commits:
+            newcommit = False
+            commit = self.commits[commit.id]
         else:
-            commitinfo = CommitInfo(commit)
-            self.commits[id] = commitinfo
+            # Typeconvert real quick
+            if type(commit) != CommitInfo:
+                commit = CommitInfo(commit)
 
-        if child != None:
-            childid = str(child.id)
-            # Record the child in the commitinfo.
-            commitinfo.children.append(childid)
+            # Record the commit in the tree.
+            self.commits[commit.id] = commit
 
-            # If the child was previously a root, replace it with the
-            # parent.
-            if childid in self.roots:
+        # Perform a similar type conversion for each of the parents,
+        # looking each of them up first. In each one, record the child
+        # commit.
+        newparent = [True] * len(parents)
+        for index, parent in enumerate(parents):
+            if parent.id in self.commits:
+                parents[index] = self.commits[parent.id]
+                newparent[index] = False
+            else:
+                # Typeconvert real quick, if necessary.
+                if type(parent) != CommitInfo:
+                    parent = CommitInfo(parent)
+                    parents[index] = parent
 
-                # But only replace it if the commit was newly in the
-                # tree. Otherwise, delete the other root.
-                if new:
-                    print("Replacing root %s with %s" % (childid[:8],
-                        id[:8]))
-                    self.roots[self.roots.index(childid)] = id
-                else:
-                    print("Removing non-root %s" % childid[:8])
-                    del self.roots[self.roots.index(childid)]
+            print("Recording %s as a child of %s" % (commit.sid,
+                    parent.sid))
+            parents[index].children.append(commit.id)
 
-        else:
-            # If the child was indeed null, record the parent as a new
-            # root.
-            print("Recording new root %s" % id[:8])
-            self.roots.append(id)
+
+        # If there are no parents, then the commit is a root.
+        if len(parents) == 0 and commit.id not in self.roots:
+            print("Recording new root %s" % commit.sid)
+            self.roots.append(commit.id)
+            return
