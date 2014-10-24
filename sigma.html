@@ -1,0 +1,28 @@
+<html>
+<head>
+<style type="text/css">
+  #container {
+    position: fixed;
+    left: 0px;
+    top: 0px;
+    width: 99%;
+    height: 99%;
+    z-index: 0;
+  }
+</style>
+</head>
+<body>
+<div id="container" style="border:1px solid black" ></div>
+<script src="sigma.min.js"></script>
+<script src="sigma.parsers.json.min.js"></script>
+<script>
+  sigma.parsers.json('test_graph_data.json', {
+    container: 'container',
+    settings: {
+      defaultNodeColor: '#ec5148',
+      adjustSizes: false
+    }
+  });
+</script>
+</body>
+</html>
