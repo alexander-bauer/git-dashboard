@@ -151,7 +151,6 @@ class RepoTree():
                 # If it matches, set its center_shift to its category's
                 # position in the list.
                 if membership_function(center_val, commit):
-                    print("Moving commit.center_shift to %s" % index)
                     commit.center_shift = index
                     continue
 
